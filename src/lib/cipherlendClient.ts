@@ -1,6 +1,5 @@
 import "./nodeGlobals";
 
-import { Buffer } from "buffer";
 import {
   Connection,
   PublicKey,
@@ -82,7 +81,11 @@ function data(discriminator: readonly number[], ...parts: Uint8Array[]) {
     out.set(part, offset);
     offset += part.length;
   }
-  return Buffer.from(out);
+  if (!globalThis.Buffer) {
+    throw new Error("Browser Buffer polyfill is not ready. Refresh the page and try again.");
+  }
+
+  return globalThis.Buffer.from(out);
 }
 
 const textEncoder = new TextEncoder();
@@ -168,6 +171,11 @@ export class CipherLendClient {
   }
 
   async submit(request: ProtocolTxRequest): Promise<ProtocolTxResult> {
+    if (typeof window !== "undefined" && !globalThis.Buffer) {
+      const { Buffer } = await import("buffer");
+      globalThis.Buffer = Buffer;
+    }
+
     if (!this.configured) {
       throw new Error(
         "CipherLend protocol is not configured. Deploy the program and set VITE_CIPHERLEND_PROGRAM_ID plus VITE_ARCIUM_MXE_PUBLIC_KEY.",

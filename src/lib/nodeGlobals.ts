@@ -1,5 +1,7 @@
-import { Buffer as NodeBuffer } from "buffer";
-
-if (!globalThis.Buffer) {
-  globalThis.Buffer = NodeBuffer;
+if (typeof window !== "undefined" && !globalThis.Buffer) {
+  void import("buffer").then(({ Buffer }) => {
+    if (!globalThis.Buffer) {
+      globalThis.Buffer = Buffer;
+    }
+  });
 }

@@ -1,6 +1,6 @@
 import "./nodeGlobals";
 
-import * as anchor from "@coral-xyz/anchor";
+import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
 import {
   getCompDefAccAddress,
@@ -30,6 +30,7 @@ export type EncryptedBorrowRiskInputs = {
 };
 
 const BORROW_RISK_CIRCUIT = "verify_borrow_eligibility";
+type ComputationOffset = Parameters<typeof getComputationAccAddress>[1];
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -61,8 +62,8 @@ function readU32Le(bytes: Uint8Array) {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, true);
 }
 
-function randomOffset() {
-  return new anchor.BN(randomBytes(8), undefined, "le");
+function randomOffset(): ComputationOffset {
+  return new BN(randomBytes(8), undefined, "le") as unknown as ComputationOffset;
 }
 
 export function getBorrowRiskAccounts(computationOffset = randomOffset()) {
