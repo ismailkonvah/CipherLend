@@ -106,7 +106,12 @@ pub mod cipherlend {
     pub fn repay(ctx: Context<MutatePosition>, amount_usdc: u64) -> Result<()> {
         require!(amount_usdc > 0, CipherLendError::InvalidAmount);
         let position = &mut ctx.accounts.position;
-        position.borrowed_usdc = position.borrowed_usdc.saturating_sub(amount_usdc);
+
+        let pending_payment = amount_usdc.min(position.pending_borrow_usdc);
+        position.pending_borrow_usdc = position.pending_borrow_usdc.saturating_sub(pending_payment);
+
+        let remaining_payment = amount_usdc.saturating_sub(pending_payment);
+        position.borrowed_usdc = position.borrowed_usdc.saturating_sub(remaining_payment);
         Ok(())
     }
 }

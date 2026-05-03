@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { useLending, computeRisk, fmtUsd } from "@/lib/store";
 import { ArciumComputeOverlay } from "@/components/ArciumComputeOverlay";
 import { PageHeader } from "./app.deposit";
@@ -22,6 +23,7 @@ function RepayPage() {
   const [amount, setAmount] = useState(0);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const max = borrowedUsdc;
   const remaining = Math.max(0, borrowedUsdc - amount);
@@ -35,15 +37,24 @@ function RepayPage() {
     }
     setComputing(true);
     try {
-      await cipherLendClient.submit({
+      const result = await cipherLendClient.submit({
         action: "repay",
         owner: walletAddress ?? "",
         amountUsdc: BigInt(Math.floor(amount * 1_000_000)),
       });
+      const repaidAmount = amount;
       repay(amount);
       setAmount(0);
       setError(null);
+      const message = `Repay successful: ${fmtUsd(repaidAmount)} removed from your onchain position.`;
+      setSuccess(message);
+      toast.success("Repay successful", {
+        description: result.signature
+          ? `Confirmed on devnet: ${result.signature.slice(0, 8)}...${result.signature.slice(-8)}`
+          : message,
+      });
     } catch (err) {
+      setSuccess(null);
       setError(err instanceof Error ? err.message : "Could not submit repay.");
     } finally {
       setComputing(false);
@@ -181,6 +192,11 @@ function RepayPage() {
           {error && (
             <div className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
               {error}
+            </div>
+          )}
+          {success && !error && (
+            <div className="mt-3 rounded-md border border-success/40 bg-success/10 p-3 text-xs text-success">
+              {success}
             </div>
           )}
           <div className="mt-3 flex items-center justify-between">
