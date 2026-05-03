@@ -27,6 +27,10 @@ bun.lockb
 # Anchor / Rust build artifacts
 protocol/target/
 protocol/.anchor/
+protocol/artifacts/
+protocol/build/
+protocol/encrypted-ixs/arcis_temp_target/
+protocol/encrypted-ixs/src/main.rs
 target/
 
 # Editor directories and files

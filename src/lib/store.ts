@@ -10,6 +10,7 @@ export interface LendingState {
 
   collateralSol: number;
   borrowedUsdc: number;
+  pendingBorrowUsdc: number;
 
   // Market data
   solPrice: number;
@@ -19,7 +20,7 @@ export interface LendingState {
   connect: (label: string, address: string) => void;
   disconnect: () => void;
   setSolBalance: (amount: number) => void;
-  setPosition: (collateralSol: number, borrowedUsdc: number) => void;
+  setPosition: (collateralSol: number, borrowedUsdc: number, pendingBorrowUsdc?: number) => void;
   deposit: (amount: number) => void;
   withdraw: (amount: number) => void;
   borrow: (amount: number) => void;
@@ -35,6 +36,7 @@ export const useLending = create<LendingState>((set, get) => ({
 
   collateralSol: 0,
   borrowedUsdc: 0,
+  pendingBorrowUsdc: 0,
 
   solPrice: 168.42,
   marketStress: 0.15,
@@ -47,9 +49,11 @@ export const useLending = create<LendingState>((set, get) => ({
       walletAddress: null,
       collateralSol: 0,
       borrowedUsdc: 0,
+      pendingBorrowUsdc: 0,
     }),
   setSolBalance: (solBalance) => set({ solBalance }),
-  setPosition: (collateralSol, borrowedUsdc) => set({ collateralSol, borrowedUsdc }),
+  setPosition: (collateralSol, borrowedUsdc, pendingBorrowUsdc = 0) =>
+    set({ collateralSol, borrowedUsdc, pendingBorrowUsdc }),
 
   deposit: (amount) => {
     const s = get();
@@ -64,12 +68,17 @@ export const useLending = create<LendingState>((set, get) => ({
   borrow: (amount) => {
     const s = get();
     if (amount <= 0) return;
-    set({ borrowedUsdc: s.borrowedUsdc + amount });
+    set({ pendingBorrowUsdc: s.pendingBorrowUsdc + amount });
   },
   repay: (amount) => {
     const s = get();
     if (amount <= 0) return;
-    set({ borrowedUsdc: Math.max(0, s.borrowedUsdc - amount) });
+    const pendingPayment = Math.min(amount, s.pendingBorrowUsdc);
+    const remaining = Math.max(0, amount - pendingPayment);
+    set({
+      pendingBorrowUsdc: Math.max(0, s.pendingBorrowUsdc - pendingPayment),
+      borrowedUsdc: Math.max(0, s.borrowedUsdc - remaining),
+    });
   },
   setMarketStress: (marketStress) => set({ marketStress }),
 }));

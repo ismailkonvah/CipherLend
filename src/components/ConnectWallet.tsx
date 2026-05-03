@@ -41,9 +41,9 @@ export function ConnectWallet({ variant = "default" }: { variant?: "default" | "
         setSolBalance(balance);
         if (position) {
           const collateralSol = Number(position.collateralLamports) / 1_000_000_000;
-          const borrowedUsdc =
-            Number(position.borrowedUsdc + position.pendingBorrowUsdc) / 1_000_000;
-          setPosition(collateralSol, borrowedUsdc);
+          const borrowedUsdc = Number(position.borrowedUsdc) / 1_000_000;
+          const pendingBorrowUsdc = Number(position.pendingBorrowUsdc) / 1_000_000;
+          setPosition(collateralSol, borrowedUsdc, pendingBorrowUsdc);
         } else {
           setPosition(0, 0);
         }
@@ -80,7 +80,7 @@ export function ConnectWallet({ variant = "default" }: { variant?: "default" | "
 
   if (connected && walletAddress) {
     return (
-      <div className="flex min-w-0 flex-col items-end gap-1">
+      <div className="flex min-w-0 max-w-[52vw] flex-col items-end gap-1 sm:max-w-none">
         <div className="flex min-w-0 items-center gap-2">
           <button
             onClick={() => {
@@ -89,10 +89,13 @@ export function ConnectWallet({ variant = "default" }: { variant?: "default" | "
               setTimeout(() => setCopied(false), 1200);
             }}
             title={`Copy ${walletAddress}`}
-            className="inline-flex min-w-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-mono hover:border-foreground transition"
+            className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-full border border-border bg-card px-2.5 py-1.5 text-xs font-mono hover:border-foreground transition sm:px-3"
           >
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-            <span className="truncate">
+            <span className="truncate sm:hidden">
+              {shortAddress(walletAddress)} · {solBalance.toFixed(2)}
+            </span>
+            <span className="hidden truncate sm:inline">
               {walletLabel} · {shortAddress(walletAddress)} · {solBalance.toFixed(3)} SOL
             </span>
             {copied ? (
@@ -125,7 +128,7 @@ export function ConnectWallet({ variant = "default" }: { variant?: "default" | "
           {variant === "default" && (
             <button
               onClick={handleDisconnect}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="hidden text-xs text-muted-foreground hover:text-foreground sm:inline"
             >
               Sign out
             </button>
@@ -144,9 +147,10 @@ export function ConnectWallet({ variant = "default" }: { variant?: "default" | "
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 transition"
+        className="inline-flex shrink-0 items-center gap-2 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 transition sm:px-4"
       >
-        Connect wallet
+        <span className="sm:hidden">Connect</span>
+        <span className="hidden sm:inline">Connect wallet</span>
       </button>
 
       <AnimatePresence>

@@ -22,6 +22,7 @@ function DepositPage() {
     solBalance,
     collateralSol,
     borrowedUsdc,
+    pendingBorrowUsdc,
     solPrice,
     marketStress,
     deposit,
@@ -39,8 +40,9 @@ function DepositPage() {
   const max = Number.isFinite(solBalance) ? Math.max(0, solBalance) : 0;
   const sliderMax = Math.max(max, amount, 1);
   const amountExceedsBalance = amount > max;
-  const projected = computeRisk(collateralSol + amount, borrowedUsdc, solPrice, marketStress);
-  const withdrawMax = borrowedUsdc > 0 ? 0 : collateralSol;
+  const totalDebtUsdc = borrowedUsdc + pendingBorrowUsdc;
+  const projected = computeRisk(collateralSol + amount, totalDebtUsdc, solPrice, marketStress);
+  const withdrawMax = totalDebtUsdc > 0 ? 0 : collateralSol;
   const withdrawSliderMax = Math.max(withdrawMax, withdrawAmount, 1);
   const withdrawExceedsCollateral = withdrawAmount > withdrawMax;
   const networkFee = amount > 0 ? 0.000005 : 0; // SOL — illustrative
@@ -110,7 +112,7 @@ function DepositPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-2xl space-y-6">
       <PageHeader
         eyebrow="Action · 01"
         title="Deposit collateral"
@@ -156,7 +158,7 @@ function DepositPage() {
                 value={amount || ""}
                 onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
                 placeholder="0.00"
-                className="w-36 bg-transparent text-right font-serif text-3xl num focus:outline-none"
+                className="w-24 bg-transparent text-right font-serif text-2xl num focus:outline-none sm:w-36 sm:text-3xl"
               />
             </div>
 
@@ -294,7 +296,7 @@ function DepositPage() {
               <div className="flex-1">
                 <div className="font-medium">SOL</div>
                 <div className="text-xs text-muted-foreground">
-                  {borrowedUsdc > 0
+                  {totalDebtUsdc > 0
                     ? "Repay active or pending debt before withdrawing"
                     : "Return collateral from your vault PDA"}
                 </div>
@@ -305,7 +307,7 @@ function DepositPage() {
                 onChange={(e) => setWithdrawAmount(Math.max(0, Number(e.target.value) || 0))}
                 placeholder="0.00"
                 disabled={withdrawMax <= 0}
-                className="w-36 bg-transparent text-right font-serif text-3xl num focus:outline-none disabled:opacity-40"
+                className="w-24 bg-transparent text-right font-serif text-2xl num focus:outline-none disabled:opacity-40 sm:w-36 sm:text-3xl"
               />
             </div>
 
@@ -345,7 +347,7 @@ function DepositPage() {
                   Max
                 </button>
               </div>
-              {borrowedUsdc > 0 && (
+              {totalDebtUsdc > 0 && (
                 <div className="mt-2 text-xs text-warning">
                   Withdraw is locked while your private borrow request or debt is outstanding.
                 </div>

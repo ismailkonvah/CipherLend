@@ -26,10 +26,10 @@ const steps: { id: OnboardingStep; label: string; to: string; helper: string }[]
 ];
 
 function useCurrentStep(): OnboardingStep {
-  const { connected, collateralSol, borrowedUsdc } = useLending();
+  const { connected, collateralSol, borrowedUsdc, pendingBorrowUsdc } = useLending();
   if (!connected) return "connect";
   if (collateralSol === 0) return "deposit";
-  if (borrowedUsdc === 0) return "borrow";
+  if (borrowedUsdc + pendingBorrowUsdc === 0) return "borrow";
   return "borrow";
 }
 
@@ -42,7 +42,7 @@ export function OnboardingStepper({ active }: { active?: OnboardingStep }) {
 
   return (
     <div className="border border-border rounded-xl bg-card overflow-hidden">
-      <div className="grid grid-cols-3 divide-x divide-border">
+      <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {steps.map((s, i) => {
           const done = i < currentIdx;
           const isFocus = i === focusIdx;

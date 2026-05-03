@@ -10,11 +10,13 @@ export const Route = createFileRoute("/app/liquidation")({
 });
 
 function LiquidationPage() {
-  const { connected, collateralSol, borrowedUsdc, solPrice, marketStress } = useLending();
-  const r = computeRisk(collateralSol, borrowedUsdc, solPrice, marketStress);
+  const { connected, collateralSol, borrowedUsdc, pendingBorrowUsdc, solPrice, marketStress } =
+    useLending();
+  const totalDebtUsdc = borrowedUsdc + pendingBorrowUsdc;
+  const r = computeRisk(collateralSol, totalDebtUsdc, solPrice, marketStress);
 
   return (
-    <div className="max-w-3xl">
+    <div className="w-full max-w-3xl">
       <PageHeader
         eyebrow="Surveillance · 04"
         title="Liquidation watch"
@@ -32,7 +34,7 @@ function LiquidationPage() {
           body="CipherLend is designed to keep liquidation thresholds in the encrypted Arcium risk path instead of exposing raw health factors."
           cta={{ to: "/app", label: "Go to dashboard" }}
         />
-      ) : borrowedUsdc === 0 ? (
+      ) : totalDebtUsdc === 0 ? (
         <EditorialEmpty
           eyebrow="No active loan"
           title={<>Nothing to liquidate. Yet.</>}
@@ -50,6 +52,11 @@ function LiquidationPage() {
             </div>
             <PrivacyExplainerTrigger>How is this private?</PrivacyExplainerTrigger>
           </div>
+          {pendingBorrowUsdc > 0 && (
+            <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+              Pending Arcium settlement is included in this liquidation watch.
+            </div>
+          )}
 
           <div>
             <div className="label-eyebrow mb-2">Proximity to liquidation · private</div>
@@ -60,7 +67,7 @@ function LiquidationPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-border pt-5 text-sm">
+          <div className="grid grid-cols-1 gap-4 border-t border-border pt-5 text-sm sm:grid-cols-2">
             <div>
               <div className="label-eyebrow">Exact threshold</div>
               <div className="mt-1 font-mono tracking-[0.25em] text-muted-foreground">······</div>

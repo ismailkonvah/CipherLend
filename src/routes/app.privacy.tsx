@@ -10,7 +10,7 @@ export const Route = createFileRoute("/app/privacy")({
 function PrivacyPage() {
   const { marketStress, setMarketStress } = useLending();
   return (
-    <div className="max-w-4xl space-y-10">
+    <div className="w-full max-w-4xl space-y-8 md:space-y-10">
       <PageHeader
         eyebrow="System"
         title="Privacy engine"
@@ -61,7 +61,7 @@ function PrivacyPage() {
       >
         <div className="label-eyebrow">Live encrypted flow</div>
 
-        <div className="mt-6 space-y-4 font-mono text-xs">
+        <div className="mt-6 space-y-4 overflow-hidden font-mono text-xs">
           <Box label="01 · Frontend · wallet & UI" />
           <Pipe />
           <Box label="02 · Anchor program · Solana" />
@@ -77,7 +77,7 @@ function PrivacyPage() {
 
       {/* Market simulator */}
       <section className="border border-border rounded-xl bg-card p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="label-eyebrow">Simulator</div>
             <div className="mt-1 font-serif text-2xl">Market stress</div>
@@ -85,7 +85,9 @@ function PrivacyPage() {
               Triggers private re-evaluation of LTV and liquidation thresholds.
             </p>
           </div>
-          <span className="font-mono text-3xl num">{(marketStress * 100).toFixed(0)}%</span>
+          <span className="font-mono text-2xl num sm:text-3xl">
+            {(marketStress * 100).toFixed(0)}%
+          </span>
         </div>
         <input
           type="range"

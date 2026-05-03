@@ -42,8 +42,11 @@ export function TxPreview({
 
       <div className="border-t border-border p-5 space-y-2">
         {details.map((d) => (
-          <div key={d.label} className="flex items-baseline justify-between gap-4 text-sm">
-            <div className="flex items-center gap-2">
+          <div
+            key={d.label}
+            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm"
+          >
+            <div className="flex min-w-0 items-center gap-2">
               <span className="text-muted-foreground">{d.label}</span>
               {d.visibility === "offchain" && (
                 <span
@@ -62,7 +65,7 @@ export function TxPreview({
                 </span>
               )}
             </div>
-            <div className="text-right">
+            <div className="ml-auto text-right">
               <div
                 className={`font-mono num ${d.emphasis ? "text-foreground" : "text-foreground/80"}`}
               >
@@ -89,12 +92,16 @@ function Side({
   kind: "give" | "receive";
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-      <div>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="min-w-0">
         <div className="label-eyebrow">{label}</div>
         <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>
       </div>
-      <div className={`font-serif text-2xl num ${kind === "receive" ? "text-foreground" : ""}`}>
+      <div
+        className={`ml-auto break-words text-right font-serif text-xl num sm:text-2xl ${
+          kind === "receive" ? "text-foreground" : ""
+        }`}
+      >
         {main}
       </div>
     </div>

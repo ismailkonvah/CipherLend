@@ -12,13 +12,16 @@ export const Route = createFileRoute("/app/")({
 });
 
 function Dashboard() {
-  const { connected, collateralSol, borrowedUsdc, solPrice, marketStress } = useLending();
-  const r = computeRisk(collateralSol, borrowedUsdc, solPrice, marketStress);
+  const { connected, collateralSol, borrowedUsdc, pendingBorrowUsdc, solPrice, marketStress } =
+    useLending();
+  const totalDebtUsdc = borrowedUsdc + pendingBorrowUsdc;
+  const hasPendingSettlement = pendingBorrowUsdc > 0;
+  const r = computeRisk(collateralSol, totalDebtUsdc, solPrice, marketStress);
 
-  const onboardingComplete = connected && collateralSol > 0 && borrowedUsdc > 0;
+  const onboardingComplete = connected && collateralSol > 0 && totalDebtUsdc > 0;
 
   return (
-    <div className="max-w-5xl space-y-10">
+    <div className="w-full max-w-5xl space-y-8 md:space-y-10">
       {/* Onboarding — visible until user has completed all 3 steps */}
       {!onboardingComplete && (
         <section className="space-y-3">
@@ -42,7 +45,7 @@ function Dashboard() {
           >
             <div className="md:col-span-7">
               <div className="label-eyebrow">Position · overview</div>
-              <h1 className="mt-2 font-serif text-5xl md:text-6xl tracking-tight num">
+              <h1 className="mt-2 font-serif text-4xl sm:text-5xl md:text-6xl tracking-tight num">
                 {fmtUsd(r.collateralUsd)}
               </h1>
               <div className="mt-2 text-sm text-muted-foreground">
@@ -51,7 +54,9 @@ function Dashboard() {
             </div>
             <div className="md:col-span-5 flex flex-col items-start md:items-end gap-2">
               <RiskBadge tier={r.tier} />
-              <div className="text-xs text-muted-foreground font-mono">verified · arcium mpc</div>
+              <div className="text-xs text-muted-foreground font-mono">
+                {hasPendingSettlement ? "pending arcium settlement" : "verified / arcium mpc"}
+              </div>
               <div className="w-full md:w-56 mt-1">
                 <RiskBar tier={r.tier} />
               </div>
@@ -59,8 +64,13 @@ function Dashboard() {
           </motion.section>
 
           {/* Metrics grid */}
-          <section className="border-y border-border grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-border">
-            <Stat label="Borrowed" value={fmtUsd(borrowedUsdc)} sub="USDC" />
+          <section className="grid grid-cols-1 divide-y divide-border border-y border-border sm:grid-cols-2 sm:divide-x md:grid-cols-5 md:divide-y-0">
+            <Stat label="Borrowed" value={fmtUsd(borrowedUsdc)} sub="Active USDC" />
+            <Stat
+              label="Pending"
+              value={fmtUsd(pendingBorrowUsdc)}
+              sub={hasPendingSettlement ? "Arcium settlement" : "None"}
+            />
             <Stat label="Safe borrow" value={fmtUsd(r.safeBorrow)} sub="Available" />
             <StatCustom label="Health factor" sub="Reveal locally">
               <EncryptedValue value={r.health === Infinity ? "∞" : r.health.toFixed(2)} />
@@ -76,6 +86,12 @@ function Dashboard() {
               <div className="label-eyebrow">Actions</div>
               <PrivacyExplainerTrigger />
             </div>
+            {hasPendingSettlement && (
+              <div className="mb-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+                Borrow request pending Arcium settlement. Repay can clear the pending request while
+                the confidential callback is outstanding.
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <Action to="/app/deposit" title="Deposit" />
               <Action to="/app/borrow" title="Borrow" emphasis />

@@ -17,16 +17,25 @@ export const Route = createFileRoute("/app/repay")({
 });
 
 function RepayPage() {
-  const { connected, walletAddress, borrowedUsdc, collateralSol, solPrice, marketStress, repay } =
-    useLending();
-  const r = computeRisk(collateralSol, borrowedUsdc, solPrice, marketStress);
+  const {
+    connected,
+    walletAddress,
+    borrowedUsdc,
+    pendingBorrowUsdc,
+    collateralSol,
+    solPrice,
+    marketStress,
+    repay,
+  } = useLending();
+  const totalDebtUsdc = borrowedUsdc + pendingBorrowUsdc;
+  const r = computeRisk(collateralSol, totalDebtUsdc, solPrice, marketStress);
   const [amount, setAmount] = useState(0);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const max = borrowedUsdc;
-  const remaining = Math.max(0, borrowedUsdc - amount);
+  const max = totalDebtUsdc;
+  const remaining = Math.max(0, totalDebtUsdc - amount);
   const projected = computeRisk(collateralSol, remaining, solPrice, marketStress);
 
   const submit = async () => {
@@ -62,7 +71,7 @@ function RepayPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-2xl space-y-6">
       <PageHeader
         eyebrow="Action · 03"
         title="Repay loan"
@@ -76,7 +85,7 @@ function RepayPage() {
           body="You can only repay loans associated with your connected wallet."
           cta={{ to: "/app", label: "Back to dashboard" }}
         />
-      ) : borrowedUsdc === 0 ? (
+      ) : totalDebtUsdc === 0 ? (
         <EditorialEmpty
           eyebrow="Nothing outstanding"
           title={
@@ -95,8 +104,14 @@ function RepayPage() {
         >
           <div className="flex items-center justify-between text-xs">
             <span className="label-eyebrow">Outstanding</span>
-            <span className="font-mono">{fmtUsd(borrowedUsdc)}</span>
+            <span className="font-mono">{fmtUsd(totalDebtUsdc)}</span>
           </div>
+          {pendingBorrowUsdc > 0 && (
+            <div className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+              {fmtUsd(pendingBorrowUsdc)} is still pending Arcium settlement. Repaying clears the
+              pending request first, then active debt.
+            </div>
+          )}
 
           <div className="mt-3 flex items-center gap-3 border-b border-border pb-4">
             <div className="h-9 w-9 rounded-full border border-border grid place-items-center font-serif italic">
@@ -108,7 +123,7 @@ function RepayPage() {
               value={amount || ""}
               onChange={(e) => setAmount(Math.min(max, Math.max(0, Number(e.target.value) || 0)))}
               placeholder="0"
-              className="w-36 bg-transparent text-right font-serif text-3xl num focus:outline-none"
+              className="w-24 bg-transparent text-right font-serif text-2xl num focus:outline-none sm:w-36 sm:text-3xl"
             />
           </div>
 

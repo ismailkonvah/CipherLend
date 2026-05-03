@@ -3,9 +3,16 @@ import "./nodeGlobals";
 import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
 import {
+  getArciumProgramId,
+  getClockAccAddress,
   getCompDefAccAddress,
   getCompDefAccOffset,
   getComputationAccAddress,
+  getClusterAccAddress,
+  getExecutingPoolAccAddress,
+  getFeePoolAccAddress,
+  getMempoolAccAddress,
+  getMXEAccAddress,
   RescueCipher,
   x25519,
 } from "@arcium-hq/client";
@@ -27,6 +34,13 @@ export type EncryptedBorrowRiskInputs = {
   computationAccount: string;
   compDefOffset: number;
   compDefAccount: string;
+  mxeAccount: string;
+  mempoolAccount: string;
+  executingPool: string;
+  clusterAccount: string;
+  poolAccount: string;
+  clockAccount: string;
+  arciumProgram: string;
 };
 
 const BORROW_RISK_CIRCUIT = "verify_borrow_eligibility";
@@ -84,6 +98,13 @@ export function getBorrowRiskAccounts(computationOffset = randomOffset()) {
     computationAccount,
     compDefOffset,
     compDefAccount,
+    mxeAccount: getMXEAccAddress(mxeProgramId).toBase58(),
+    mempoolAccount: getMempoolAccAddress(ARCIUM_CLUSTER_OFFSET).toBase58(),
+    executingPool: getExecutingPoolAccAddress(ARCIUM_CLUSTER_OFFSET).toBase58(),
+    clusterAccount: getClusterAccAddress(ARCIUM_CLUSTER_OFFSET).toBase58(),
+    poolAccount: getFeePoolAccAddress().toBase58(),
+    clockAccount: getClockAccAddress().toBase58(),
+    arciumProgram: getArciumProgramId().toBase58(),
   };
 }
 
@@ -98,12 +119,16 @@ export function encryptBorrowRiskInputs(plaintext: BorrowRiskPlaintext): Encrypt
   const sharedSecret = x25519.getSharedSecret(clientSecretKey, mxePublicKey);
   const cipher = new RescueCipher(sharedSecret);
   const nonceBytes = randomBytes(16);
+  const collateralMilliSol = plaintext.collateralLamports / 1_000_000n;
+  const borrowedWholeUsd = plaintext.borrowedUsdc / 1_000_000n;
+  const requestedWholeUsd = plaintext.requestedUsdc / 1_000_000n;
+  const solPriceWholeUsd = plaintext.solPriceMicroUsd / 1_000_000n;
   const ciphertexts = cipher.encrypt(
     [
-      plaintext.collateralLamports,
-      plaintext.borrowedUsdc,
-      plaintext.requestedUsdc,
-      plaintext.solPriceMicroUsd,
+      collateralMilliSol,
+      borrowedWholeUsd,
+      requestedWholeUsd,
+      solPriceWholeUsd,
       plaintext.marketStressBps,
     ],
     nonceBytes,
@@ -119,5 +144,12 @@ export function encryptBorrowRiskInputs(plaintext: BorrowRiskPlaintext): Encrypt
     computationAccount: accounts.computationAccount,
     compDefOffset: accounts.compDefOffset,
     compDefAccount: accounts.compDefAccount,
+    mxeAccount: accounts.mxeAccount,
+    mempoolAccount: accounts.mempoolAccount,
+    executingPool: accounts.executingPool,
+    clusterAccount: accounts.clusterAccount,
+    poolAccount: accounts.poolAccount,
+    clockAccount: accounts.clockAccount,
+    arciumProgram: accounts.arciumProgram,
   };
 }

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/app/settings")({
 
 function SettingsPage() {
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-2xl space-y-6">
       <PageHeader eyebrow="System" title="Settings" sub="Preferences for confidential lending." />
 
       <section className="border border-border rounded-xl bg-card divide-y divide-border">

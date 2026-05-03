@@ -18,21 +18,36 @@ export const Route = createFileRoute("/app/borrow")({
 });
 
 function BorrowPage() {
-  const { connected, walletAddress, collateralSol, borrowedUsdc, solPrice, marketStress, borrow } =
-    useLending();
-  const r = computeRisk(collateralSol, borrowedUsdc, solPrice, marketStress);
+  const {
+    connected,
+    walletAddress,
+    collateralSol,
+    borrowedUsdc,
+    pendingBorrowUsdc,
+    solPrice,
+    marketStress,
+    borrow,
+  } = useLending();
+  const totalDebtUsdc = borrowedUsdc + pendingBorrowUsdc;
+  const hasPendingSettlement = pendingBorrowUsdc > 0;
+  const r = computeRisk(collateralSol, totalDebtUsdc, solPrice, marketStress);
   const [amount, setAmount] = useState(0);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const max = Number.isFinite(r.safeBorrow) ? Math.max(0, Math.floor(r.safeBorrow)) : 0;
-  const projected = computeRisk(collateralSol, borrowedUsdc + amount, solPrice, marketStress);
+  const max =
+    !hasPendingSettlement && Number.isFinite(r.safeBorrow) ? Math.max(0, Math.floor(r.safeBorrow)) : 0;
+  const projected = computeRisk(collateralSol, totalDebtUsdc + amount, solPrice, marketStress);
   const originationFeeBps = 10; // 0.10%
   const originationFee = (amount * originationFeeBps) / 10_000;
   const netReceived = Math.max(0, amount - originationFee);
 
   const submit = async () => {
+    if (hasPendingSettlement) {
+      setError("A borrow request is already pending Arcium settlement. Repay it before borrowing again.");
+      return;
+    }
     if (amount <= 0 || amount > max) return;
     if (!protocolConfigured) {
       setError(missingProtocolMessage("Borrowing USDC"));
@@ -45,7 +60,7 @@ function BorrowPage() {
         owner: walletAddress ?? "",
         amountUsdc: BigInt(Math.floor(amount * 1_000_000)),
         collateralLamports: BigInt(Math.floor(collateralSol * 1_000_000_000)),
-        borrowedUsdc: BigInt(Math.floor(borrowedUsdc * 1_000_000)),
+        borrowedUsdc: BigInt(Math.floor(totalDebtUsdc * 1_000_000)),
         solPriceMicroUsd: BigInt(Math.floor(solPrice * 1_000_000)),
         marketStressBps: BigInt(Math.floor(marketStress * 10_000)),
       });
@@ -69,7 +84,7 @@ function BorrowPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-2xl space-y-6">
       <PageHeader
         eyebrow="Action · 02"
         title="Borrow USDC"
@@ -105,6 +120,12 @@ function BorrowPage() {
             <span className="label-eyebrow">Safe borrow limit · private</span>
             <span className="font-mono">{fmtUsd(max)}</span>
           </div>
+          {hasPendingSettlement && (
+            <div className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+              {fmtUsd(pendingBorrowUsdc)} is pending Arcium settlement. Repay the pending request
+              before submitting another private borrow.
+            </div>
+          )}
 
           <div className="mt-3 flex items-center gap-3 border-b border-border pb-4">
             <div className="h-9 w-9 rounded-full border border-border grid place-items-center font-serif italic">
@@ -119,7 +140,7 @@ function BorrowPage() {
               value={amount || ""}
               onChange={(e) => setAmount(Math.min(max, Math.max(0, Number(e.target.value) || 0)))}
               placeholder="0"
-              className="w-36 bg-transparent text-right font-serif text-3xl num focus:outline-none"
+              className="w-24 bg-transparent text-right font-serif text-2xl num focus:outline-none sm:w-36 sm:text-3xl"
             />
           </div>
 
@@ -191,7 +212,7 @@ function BorrowPage() {
                   { label: "Network fee", value: "0.000005 SOL", visibility: "onchain" },
                   {
                     label: "Total debt after",
-                    value: fmtUsd(borrowedUsdc + amount),
+                    value: fmtUsd(totalDebtUsdc + amount),
                     emphasis: true,
                     visibility: "onchain",
                   },
@@ -209,7 +230,7 @@ function BorrowPage() {
 
           <button
             onClick={submit}
-            disabled={amount <= 0 || amount > max || computing}
+            disabled={amount <= 0 || amount > max || computing || hasPendingSettlement}
             className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-medium text-background disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition"
           >
             {protocolConfigured

@@ -11,9 +11,13 @@ The project was built for the private lending and borrowing track: public DeFi l
 - Real devnet program deployment.
 - Real SOL collateral deposits into a deterministic vault PDA.
 - Position PDA creation and collateral accounting.
-- Borrow request serialization with encrypted risk inputs.
+- Borrow request serialization with encrypted risk inputs and Arcium queue accounts.
+- Arcium encrypted borrow-risk circuit generated from `protocol/encrypted-ixs`.
+- Arcium callback settlement code that verifies signed computation output and only moves pending debt into active debt when approved.
+- Pending Arcium settlement tracking in the app, so users can see when a borrow request is waiting for confidential settlement.
 - Arcium MXE deployed and initialized on devnet.
 - UI flows for deposit, borrow request, repay, liquidation watch, and privacy explanation.
+- Responsive app shell with desktop sidebar and mobile bottom navigation.
 
 ## Devnet Deployment
 
@@ -32,10 +36,13 @@ CipherLend uses Arcium in the borrow-risk path:
 
 1. The frontend prepares private borrow-risk inputs, including collateral amount, existing debt, requested borrow amount, SOL price, and market stress.
 2. Those inputs are encrypted client-side using the configured Arcium MXE public key.
-3. The encrypted payload is submitted with the borrow request instruction.
-4. The intended protocol path is for Arcium MPC to evaluate health factor, dynamic LTV, liquidation threshold, and risk tier without exposing those values publicly.
+3. The encrypted payload is submitted to the Solana program with the Arcium computation, mempool, execution-pool, cluster, fee-pool, and computation-definition accounts.
+4. The program queues the `verify_borrow_eligibility` encrypted computation in Arcium.
+5. Arcium MPC evaluates dynamic LTV and risk tier without exposing the private inputs.
+6. While the computation is outstanding, the app shows the borrow as pending Arcium settlement instead of pretending it is already active debt.
+7. The Arcium callback verifies `SignedComputationOutputs` and settles the borrow by moving `pending_borrow_usdc` into `borrowed_usdc` only if the computation approves it.
 
-In the current devnet build, the MXE is deployed and the client-side encryption path is wired. The full encrypted instruction callback that finalizes borrow approval is the next protocol milestone.
+The deployed devnet prototype includes the queue-and-callback path, plus UI handling for pending settlement, duplicate borrow prevention, repay, and vault withdraw guards.
 
 ## Privacy Benefits
 
@@ -73,7 +80,8 @@ Important files:
 - `src/lib/arcium.ts` - Arcium encryption helpers and computation account derivation
 - `src/lib/solana.ts` - wallet detection and Solana RPC helpers
 - `protocol/programs/cipherlend/src/lib.rs` - Anchor program
-- `protocol/programs/cipherlend/src/circuits/risk.rs` - draft confidential risk circuit
+- `protocol/encrypted-ixs/src/lib.rs` - Arcium confidential borrow-risk circuit
+- `protocol/Arcium.toml` - localnet and devnet Arcium cluster configuration
 
 ## Run The Frontend
 
@@ -124,14 +132,24 @@ Check the generated IDL includes the vault account:
 grep -n "vault" target/idl/cipherlend.json
 ```
 
+After deployment, initialize and upload the borrow-risk computation definition if needed. The Arcium template flow uses the generated `build/verify_borrow_eligibility.arcis` artifact and the `init_verify_borrow_eligibility_comp_def` instruction before encrypted borrow requests can finalize.
+
+The helper script uploads the generated computation definition:
+
+```bash
+cd "/mnt/c/Users/user/Documents/secure-lend-vault-main/Cipher Lend"
+ARCIUM_UPLOAD_CHUNK_SIZE=10 npm run init:borrow-comp-def
+```
+
 ## Current Limitations
 
 CipherLend is a devnet prototype, not production lending infrastructure.
 
 - The deposit path moves real devnet SOL into a vault PDA.
-- Borrow requests encrypt risk inputs and submit protocol state, but the final Arcium callback that approves and settles a borrow is still the next milestone.
-- The repayment path updates accounting state; tokenized USDC minting/transfer settlement is not implemented.
-- The risk circuit exists as a draft in `protocol/programs/cipherlend/src/circuits/risk.rs`.
+- The borrow path queues a real Arcium encrypted computation and tracks pending settlement onchain.
+- The repayment path updates protocol accounting state; tokenized USDC minting/transfer settlement is not implemented.
+- Pending borrows are represented as protocol accounting state until the Arcium callback settles them into active borrowed debt.
+- The risk model is intentionally simple for the prototype: dynamic LTV from encrypted collateral, debt, requested borrow, SOL price, and market stress.
 - No audit has been performed.
 
 ## Why It Matters

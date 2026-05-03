@@ -7,6 +7,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
+import bs58 from "bs58";
 import { CIPHERLEND_PROGRAM_ID, ARCIUM_MXE_PUBLIC_KEY, protocolConfigured } from "./protocol";
 import { encryptBorrowRiskInputs, type EncryptedBorrowRiskInputs } from "./arcium";
 import { SOLANA_RPC_URL, getWalletProvider, type InjectedSolanaWallet } from "./solana";
@@ -40,6 +41,7 @@ export type ProtocolPosition = {
 
 const POSITION_SEED = "position";
 const VAULT_SEED = "vault";
+const SIGN_PDA_SEED = "ArciumSignerAccount";
 
 const IX = {
   depositCollateral: [156, 131, 142, 116, 146, 247, 162, 120],
@@ -99,6 +101,26 @@ function getConnectedProvider(owner: string): InjectedSolanaWallet {
   throw new Error("Connected wallet provider was not found. Reconnect your wallet and try again.");
 }
 
+function formatTransactionError(error: unknown) {
+  if (error instanceof Error) {
+    const maybeLogs = error as Error & { logs?: string[]; getLogs?: () => string[] };
+    const logs = maybeLogs.logs ?? maybeLogs.getLogs?.();
+    if (logs?.length) {
+      return `${error.message}\n${logs.slice(-8).join("\n")}`;
+    }
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const record = error as { message?: unknown; logs?: unknown };
+    const message = typeof record.message === "string" ? record.message : "Transaction failed.";
+    const logs = Array.isArray(record.logs) ? record.logs.filter((log) => typeof log === "string") : [];
+    return logs.length ? `${message}\n${logs.slice(-8).join("\n")}` : message;
+  }
+
+  return "Transaction failed.";
+}
+
 async function signAndSend(
   connection: Connection,
   provider: InjectedSolanaWallet,
@@ -109,23 +131,40 @@ async function signAndSend(
   transaction.feePayer = owner;
   transaction.recentBlockhash = blockhash;
 
-  if (provider.signAndSendTransaction) {
-    const { signature } = await provider.signAndSendTransaction(transaction);
-    await connection.confirmTransaction(
-      { signature, blockhash, lastValidBlockHeight },
-      "confirmed",
-    );
-    return signature;
+  try {
+    if (provider.signTransaction) {
+      const signed = await provider.signTransaction(transaction);
+      const signedSignature = signed.signature ? bs58.encode(signed.signature) : undefined;
+      let signature: string;
+      try {
+        signature = await connection.sendRawTransaction(signed.serialize(), {
+          preflightCommitment: "confirmed",
+        });
+      } catch (error) {
+        const message = formatTransactionError(error);
+        if (signedSignature && message.toLowerCase().includes("already been processed")) {
+          signature = signedSignature;
+        } else {
+          throw error;
+        }
+      }
+      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+      return signature;
+    }
+
+    if (provider.signAndSendTransaction) {
+      const { signature } = await provider.signAndSendTransaction(transaction);
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+      return signature;
+    }
+  } catch (error) {
+    throw new Error(formatTransactionError(error));
   }
 
-  if (!provider.signTransaction) {
-    throw new Error("Connected wallet cannot sign Solana transactions.");
-  }
-
-  const signed = await provider.signTransaction(transaction);
-  const signature = await connection.sendRawTransaction(signed.serialize());
-  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-  return signature;
+  throw new Error("Connected wallet cannot sign Solana transactions.");
 }
 
 export class CipherLendClient {
@@ -195,6 +234,10 @@ export class CipherLendClient {
     );
     const [vault] = PublicKey.findProgramAddressSync(
       [textEncoder.encode(VAULT_SEED), owner.toBuffer()],
+      programId,
+    );
+    const [signPdaAccount] = PublicKey.findProgramAddressSync(
+      [textEncoder.encode(SIGN_PDA_SEED)],
       programId,
     );
     const transaction = new Transaction();
@@ -281,13 +324,27 @@ export class CipherLendClient {
           keys: [
             { pubkey: owner, isSigner: true, isWritable: true },
             { pubkey: position, isSigner: false, isWritable: true },
+            { pubkey: signPdaAccount, isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(encryptedRiskInputs.mxeAccount), isSigner: false, isWritable: false },
+            { pubkey: new PublicKey(encryptedRiskInputs.mempoolAccount), isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(encryptedRiskInputs.executingPool), isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(encryptedRiskInputs.computationAccount), isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(encryptedRiskInputs.compDefAccount), isSigner: false, isWritable: false },
+            { pubkey: new PublicKey(encryptedRiskInputs.clusterAccount), isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(encryptedRiskInputs.poolAccount), isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(encryptedRiskInputs.clockAccount), isSigner: false, isWritable: true },
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            { pubkey: new PublicKey(encryptedRiskInputs.arciumProgram), isSigner: false, isWritable: false },
           ],
           data: data(
             IX.requestBorrow,
+            u64Le(BigInt(encryptedRiskInputs.computationOffset)),
             u64Le(request.amountUsdc),
             fixedBytes(encryptedRiskInputs.ciphertexts[0] ?? [], 32, "collateral ciphertext"),
             fixedBytes(encryptedRiskInputs.ciphertexts[1] ?? [], 32, "borrowed USDC ciphertext"),
             fixedBytes(encryptedRiskInputs.ciphertexts[2] ?? [], 32, "requested USDC ciphertext"),
+            fixedBytes(encryptedRiskInputs.ciphertexts[3] ?? [], 32, "SOL price ciphertext"),
+            fixedBytes(encryptedRiskInputs.ciphertexts[4] ?? [], 32, "market stress ciphertext"),
             fixedBytes(encryptedRiskInputs.clientPublicKey, 32, "client public key"),
             u128Le(encryptedRiskInputs.nonce),
           ),
