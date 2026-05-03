@@ -1,5 +1,6 @@
 import "./nodeGlobals";
 
+import { Buffer } from "buffer";
 import {
   Connection,
   PublicKey,
