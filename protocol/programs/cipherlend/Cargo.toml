@@ -1,0 +1,22 @@
+[package]
+name = "cipherlend"
+version = "0.1.0"
+description = "Confidential lending protocol powered by Arcium"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cipherlend"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.1"
+# Install the Arcium toolchain and align this dependency with the generated project template.
+# arcium-anchor = "*"
+# arcis = "*"
