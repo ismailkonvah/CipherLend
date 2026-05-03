@@ -32,6 +32,12 @@ export type ProtocolTxResult = {
   encryptedRiskInputs?: EncryptedBorrowRiskInputs;
 };
 
+export type ProtocolPosition = {
+  collateralLamports: bigint;
+  borrowedUsdc: bigint;
+  pendingBorrowUsdc: bigint;
+};
+
 const POSITION_SEED = "position";
 const VAULT_SEED = "vault";
 
@@ -124,6 +130,39 @@ export class CipherLendClient {
 
   get configured() {
     return protocolConfigured;
+  }
+
+  getPositionAddress(ownerAddress: string) {
+    if (!CIPHERLEND_PROGRAM_ID) {
+      throw new Error("Missing VITE_CIPHERLEND_PROGRAM_ID.");
+    }
+
+    const programId = new PublicKey(CIPHERLEND_PROGRAM_ID);
+    const owner = new PublicKey(ownerAddress);
+    return PublicKey.findProgramAddressSync(
+      [textEncoder.encode(POSITION_SEED), owner.toBuffer()],
+      programId,
+    )[0];
+  }
+
+  async getPosition(ownerAddress: string): Promise<ProtocolPosition | null> {
+    if (!this.configured) return null;
+
+    const position = this.getPositionAddress(ownerAddress);
+    const account = await this.connection.getAccountInfo(position, "confirmed");
+    if (!account) return null;
+
+    const dataView = new DataView(
+      account.data.buffer,
+      account.data.byteOffset,
+      account.data.byteLength,
+    );
+
+    return {
+      collateralLamports: dataView.getBigUint64(40, true),
+      borrowedUsdc: dataView.getBigUint64(48, true),
+      pendingBorrowUsdc: dataView.getBigUint64(56, true),
+    };
   }
 
   async submit(request: ProtocolTxRequest): Promise<ProtocolTxResult> {

@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Check, Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { useLending } from "@/lib/store";
+import { cipherLendClient } from "@/lib/cipherlendClient";
 import {
   connectWallet,
   disconnectWallet,
@@ -12,8 +13,16 @@ import {
 } from "@/lib/solana";
 
 export function ConnectWallet({ variant = "default" }: { variant?: "default" | "compact" }) {
-  const { connected, walletLabel, walletAddress, solBalance, connect, disconnect, setSolBalance } =
-    useLending();
+  const {
+    connected,
+    walletLabel,
+    walletAddress,
+    solBalance,
+    connect,
+    disconnect,
+    setSolBalance,
+    setPosition,
+  } = useLending();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState<WalletName | null>(null);
@@ -25,16 +34,27 @@ export function ConnectWallet({ variant = "default" }: { variant?: "default" | "
       if (!address) return;
       setRefreshing(true);
       try {
-        const balance = await getSolBalance(address);
+        const [balance, position] = await Promise.all([
+          getSolBalance(address),
+          cipherLendClient.getPosition(address),
+        ]);
         setSolBalance(balance);
+        if (position) {
+          const collateralSol = Number(position.collateralLamports) / 1_000_000_000;
+          const borrowedUsdc =
+            Number(position.borrowedUsdc + position.pendingBorrowUsdc) / 1_000_000;
+          setPosition(collateralSol, borrowedUsdc);
+        } else {
+          setPosition(0, 0);
+        }
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not read Solana balance.");
+        setError(err instanceof Error ? err.message : "Could not read Solana position.");
       } finally {
         setRefreshing(false);
       }
     },
-    [setSolBalance, walletAddress],
+    [setPosition, setSolBalance, walletAddress],
   );
 
   const handleConnect = async (wallet: WalletName) => {

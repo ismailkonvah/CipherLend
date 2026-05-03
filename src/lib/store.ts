@@ -19,6 +19,7 @@ export interface LendingState {
   connect: (label: string, address: string) => void;
   disconnect: () => void;
   setSolBalance: (amount: number) => void;
+  setPosition: (collateralSol: number, borrowedUsdc: number) => void;
   deposit: (amount: number) => void;
   withdraw: (amount: number) => void;
   borrow: (amount: number) => void;
@@ -48,6 +49,7 @@ export const useLending = create<LendingState>((set, get) => ({
       borrowedUsdc: 0,
     }),
   setSolBalance: (solBalance) => set({ solBalance }),
+  setPosition: (collateralSol, borrowedUsdc) => set({ collateralSol, borrowedUsdc }),
 
   deposit: (amount) => {
     const s = get();
