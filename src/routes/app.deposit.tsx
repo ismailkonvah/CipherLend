@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { useLending, computeRisk, fmtUsd, fmtSol } from "@/lib/store";
 import { ArciumComputeOverlay } from "@/components/ArciumComputeOverlay";
 import { OnboardingStepper } from "@/components/OnboardingStepper";
@@ -28,6 +29,7 @@ function DepositPage() {
   const [amount, setAmount] = useState(0);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const max = Number.isFinite(solBalance) ? Math.max(0, solBalance) : 0;
   const sliderMax = Math.max(max, amount, 1);
@@ -43,15 +45,24 @@ function DepositPage() {
     }
     setComputing(true);
     try {
-      await cipherLendClient.submit({
+      const result = await cipherLendClient.submit({
         action: "deposit",
         owner: walletAddress ?? "",
         lamports: BigInt(Math.floor(amount * 1_000_000_000)),
       });
+      const depositedAmount = amount;
       deposit(amount);
       setAmount(0);
       setError(null);
+      const message = `Deposit successful: ${fmtSol(depositedAmount)} moved into your vault.`;
+      setSuccess(message);
+      toast.success("Deposit successful", {
+        description: result.signature
+          ? `Confirmed on devnet: ${result.signature.slice(0, 8)}...${result.signature.slice(-8)}`
+          : message,
+      });
     } catch (err) {
+      setSuccess(null);
       setError(err instanceof Error ? err.message : "Could not submit deposit.");
     } finally {
       setComputing(false);
@@ -203,6 +214,11 @@ function DepositPage() {
           {error && (
             <div className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
               {error}
+            </div>
+          )}
+          {success && !error && (
+            <div className="mt-3 rounded-md border border-success/40 bg-success/10 p-3 text-xs text-success">
+              {success}
             </div>
           )}
           <div className="mt-3 flex items-center justify-between">

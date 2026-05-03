@@ -10,6 +10,9 @@ import tsConfigPaths from "vite-tsconfig-paths";
 const isVercel = Boolean(process.env.VERCEL);
 
 export default defineConfig({
+  define: {
+    Buffer: "globalThis.Buffer",
+  },
   plugins: [
     tsConfigPaths(),
     tanstackStart(),

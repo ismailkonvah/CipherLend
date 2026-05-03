@@ -1,7 +1,9 @@
 {
   "name": "cipherlend",
   "private": true,
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/lib/nodeGlobals.ts"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite dev",
