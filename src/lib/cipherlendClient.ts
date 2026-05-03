@@ -12,10 +12,11 @@ import { CIPHERLEND_PROGRAM_ID, ARCIUM_MXE_PUBLIC_KEY, protocolConfigured } from
 import { encryptBorrowRiskInputs, type EncryptedBorrowRiskInputs } from "./arcium";
 import { SOLANA_RPC_URL, getWalletProvider, type InjectedSolanaWallet } from "./solana";
 
-export type CipherLendAction = "deposit" | "borrow" | "repay";
+export type CipherLendAction = "deposit" | "withdraw" | "borrow" | "repay";
 
 export type ProtocolTxRequest =
   | { action: "deposit"; owner: string; lamports: bigint }
+  | { action: "withdraw"; owner: string; lamports: bigint }
   | {
       action: "borrow";
       owner: string;
@@ -46,6 +47,7 @@ const IX = {
   openPosition: [135, 128, 47, 77, 15, 152, 240, 49],
   repay: [234, 103, 67, 82, 208, 234, 219, 166],
   requestBorrow: [2, 237, 170, 85, 100, 157, 146, 191],
+  withdrawCollateral: [115, 135, 168, 106, 139, 214, 138, 150],
 } as const;
 
 function u64Le(value: bigint) {
@@ -215,6 +217,24 @@ export class CipherLendClient {
             { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
           ],
           data: data(IX.depositCollateral, u64Le(request.lamports)),
+        }),
+      );
+
+      const signature = await signAndSend(this.connection, provider, owner, transaction);
+      return { signature };
+    }
+
+    if (request.action === "withdraw") {
+      transaction.add(
+        new TransactionInstruction({
+          programId,
+          keys: [
+            { pubkey: owner, isSigner: true, isWritable: true },
+            { pubkey: position, isSigner: false, isWritable: true },
+            { pubkey: vault, isSigner: false, isWritable: true },
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          ],
+          data: data(IX.withdrawCollateral, u64Le(request.lamports)),
         }),
       );
 

@@ -53,6 +53,40 @@ pub mod cipherlend {
         Ok(())
     }
 
+    pub fn withdraw_collateral(ctx: Context<WithdrawCollateral>, lamports: u64) -> Result<()> {
+        require!(lamports > 0, CipherLendError::InvalidAmount);
+
+        let position = &mut ctx.accounts.position;
+        require!(
+            position.borrowed_usdc == 0 && position.pending_borrow_usdc == 0,
+            CipherLendError::OutstandingDebt
+        );
+        require!(
+            position.collateral_lamports >= lamports,
+            CipherLendError::InsufficientCollateral
+        );
+
+        let owner_key = ctx.accounts.owner.key();
+        let signer_seeds: &[&[u8]] = &[b"vault", owner_key.as_ref(), &[ctx.bumps.vault]];
+        anchor_lang::system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.owner.to_account_info(),
+                },
+                &[signer_seeds],
+            ),
+            lamports,
+        )?;
+
+        position.collateral_lamports = position
+            .collateral_lamports
+            .checked_sub(lamports)
+            .ok_or(CipherLendError::MathOverflow)?;
+        Ok(())
+    }
+
     pub fn request_borrow(
         ctx: Context<MutatePosition>,
         amount_usdc: u64,
@@ -129,6 +163,27 @@ pub struct DepositCollateral<'info> {
 }
 
 #[derive(Accounts)]
+pub struct WithdrawCollateral<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"position", owner.key().as_ref()],
+        bump = position.bump,
+        has_one = owner
+    )]
+    pub position: Account<'info, Position>,
+    /// CHECK: SOL-only vault PDA. It is system-owned and has no data.
+    #[account(
+        mut,
+        seeds = [b"vault", owner.key().as_ref()],
+        bump
+    )]
+    pub vault: SystemAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct MutatePosition<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -184,4 +239,8 @@ pub enum CipherLendError {
     InvalidAmount,
     #[msg("Math overflow")]
     MathOverflow,
+    #[msg("Insufficient deposited collateral")]
+    InsufficientCollateral,
+    #[msg("Repay or finalize pending debt before withdrawing collateral")]
+    OutstandingDebt,
 }
